@@ -1,0 +1,97 @@
+options {
+   JDK_VERSION = "1.8";
+   STATIC = false;
+}
+
+PARSER_BEGIN(UrlParser)
+
+package io.mikael.poc;
+
+import java.io.StringReader;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+
+import com.google.common.base.Supplier;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Multimaps;
+
+public class UrlParser {
+
+    private static final Supplier newList = new Supplier() {
+        @Override
+        public Object get() {
+            return new ArrayList<String>();
+        }
+    };
+
+    public static void parse(final String input) throws ParseException {
+        new UrlParser(new StringReader(input)).parse();
+    }
+
+}
+
+PARSER_END(UrlParser)
+
+TOKEN: {
+    <URL_PROTO: "http" | "https" | "ftp"> |
+    <INT: (["0"-"9"])+ > |
+    <WORD: (["a"-"z", "0"-"9" , "_"])+ >
+}
+
+void parse():
+{
+    Token protoToken, hostToken, portToken, pathToken, fragmentToken;
+    ListMultimap<String, String> qp = null;
+}
+{
+    (
+      protoToken=<URL_PROTO>
+      ":"
+      { System.out.println("proto: " + protoToken.image); }
+    )?
+
+    ( "//"
+      hostToken=<WORD>
+      { System.out.println("host: " + hostToken.image); }
+    )?
+
+    ( ":"
+      portToken=<INT>
+      { System.out.println("port: " + portToken.image); }
+    )?
+
+    ( "/"
+      pathToken=<WORD> { System.out.println("path: " + pathToken.image); }
+    )?
+
+    ( "?" qp=queryParameters() )? { System.out.println("qp: " + qp); }
+
+    ( "#"
+      "/a_fragment"
+    )?
+
+}
+
+ListMultimap<String, String> queryParameters():
+{
+    Token key = null, value = null;
+    ListMultimap<String, String> mm = Multimaps.newListMultimap(
+            new ConcurrentHashMap<String, Collection<String>>(),
+            newList);
+}
+{
+    (
+        key=<WORD> "=" value=<WORD>
+        { mm.put(key.image, value.image); }
+    )
+
+    ( "&"
+        key=<WORD> "=" value=<WORD>
+        { mm.put(key.image, value.image); }
+    )*
+
+    { return mm; }
+}
