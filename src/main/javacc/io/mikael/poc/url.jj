@@ -1,6 +1,8 @@
 options {
    JDK_VERSION = "1.8";
    STATIC = false;
+   LOOKAHEAD = 4;
+   FORCE_LA_CHECK = true;
 }
 
 PARSER_BEGIN(UrlParser)
@@ -22,12 +24,12 @@ import com.google.common.collect.Multimaps;
 public class UrlParser {
 
     public static class Result {
-        public String schema, host, port, path, fragment;
+        public String schema, username, password, host, port, path, fragment;
         public Multimap<String, String> queryParameters;
-
+        @Override
         public String toString() {
-            return String.format("%s / %s / %s / %s / %s / %s",
-                schema, host, port, path, queryParameters, fragment);
+            return String.format("%s / %s / %s / %-6s / %5s / %8s / %-22s / %s",
+                schema, username, password, host, port, path, queryParameters, fragment);
         }
     }
 
@@ -48,8 +50,8 @@ PARSER_END(UrlParser)
 
 TOKEN: {
     <URL_SCHEMA: "http" | "https" | "ftp"> |
-    <INT: (["0"-"9"])+ > |
-    <WORD: (["a"-"z", "0"-"9" , "_"])+ >
+    <WORD: (["a"-"z", "0"-"9" , "_"])+ > |
+    <INT: (["0"-"9"])+ >
 }
 
 Result parse():
@@ -63,11 +65,19 @@ Result parse():
     )?
 
     ( "//"
+
+      (
+        ret.username=<WORD>.image
+        ":"
+        ret.password=<WORD>.image
+        "@"
+      )?
+
       ret.host=<WORD>.image
     )?
 
     ( ":"
-      ret.port=<INT>.image
+      ret.port=<WORD>.image
     )?
 
     ( "/"
@@ -89,10 +99,9 @@ Result parse():
 
 ListMultimap<String, String> queryParameters():
 {
-    Token key = null, value = null;
     ListMultimap<String, String> ret = Multimaps.newListMultimap(
-            new ConcurrentHashMap<String, Collection<String>>(),
-            newList);
+            new ConcurrentHashMap<String, Collection<String>>(), newList);
+    Token key = null, value = null;
 }
 {
     (
